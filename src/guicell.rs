@@ -13,7 +13,6 @@ pub struct SolidCell {
 } impl GuiCell for SolidCell {
     fn draw(&self, surface: &mut SurfaceSlice) {
         let size = surface.size();
-        println!("Draw!");
         for y in 0..size.height() {
             for x in 0..size.width() {
                 surface.set_pixel(PixelIdx{x,y},self.color);

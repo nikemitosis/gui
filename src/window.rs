@@ -195,7 +195,6 @@ struct Surface {
         
         let size = self.size();
         if size != newsize {
-            println!("Reallocating to size {:?}",size);
             self.reallocate(newsize)
         } else {
             Ok(())

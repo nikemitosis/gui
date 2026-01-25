@@ -19,45 +19,65 @@ use std::result::Result as Result;
 
 pub const CLASS_NAME: PCWSTR = w!("mz-gui");
 
-enum EventReaction {
-    Unrecognized,
-    UseDefault,
-    NoOp,
+// events we'd like the library to handle - for when the system default is not adequete
+#[derive(Copy,Clone,Debug)]
+enum InternalEvent {
+    WindowResize,
+}
+#[derive(Copy,Clone,Debug)]
+enum WndProcEvent {
+    Internal(InternalEvent),
+    Common(CommonEvent),
+    Unknown,
 }
 
 // Error returns whether event was recognized at all
 // false means ignored, true means handled by library
-const fn translate_message(msg: u32) -> Result<CommonEvent,EventReaction> {
+const fn translate_message(msg: u32, wparam: usize, lparam: isize) -> WndProcEvent {
+    use self::{
+        WndProcEvent::*,
+        InternalEvent::*,
+    };
+    use crate::CommonEvent::*;
+    
     match msg {
-        WM_DESTROY   => Ok(CommonEvent::Shutdown),
-        WM_CLOSE     => Ok(CommonEvent::Close),
-        WM_PAINT     => Ok(CommonEvent::Draw),
-        WM_SIZE      => Ok(CommonEvent::Resize),
-        // WM_NCHITTEST => Ok(CommonEvent::QueryByCursor),
+        WM_DESTROY  => Common(Shutdown),
+        WM_CLOSE    => Common(Close),
+        WM_PAINT    => Common(Draw),
+        WM_SIZE     => Common(Resize),
         
+        /* WM_WINDOWPOSCHANGING => {
+            let winpos: WINDOWPOS = unsafe {*(lparam as *const WINDOWPOS)};
+            let flags: u32 = winpos.flags.0;
+            let is_resize = (!flags & SWP_NOSIZE.0) != 0;
+            if is_resize {
+                Internal(WindowResize)
+            } else {
+                Unknown
+            }
+        }, */
         // incomplete
         
-        (
-              WM_MOUSEFIRST
-            | WM_SETCURSOR
-            | WM_NCHITTEST
-            | WM_NCLBUTTONDBLCLK
-            | WM_NCMOUSELEAVE
-            | WM_NCMOUSEMOVE
-            | WM_WINDOWPOSCHANGING
-            | WM_WINDOWPOSCHANGED
-            | WM_GETICON // user later
-            | WM_MOVE // use later
-            | WM_MOVING // or maybe this instead
-            | WM_SETTEXT
-            | WM_ACTIVATE // use later
-            | WM_SYSKEYDOWN
-            | WM_GETMINMAXINFO // use later
-            | WM_CAPTURECHANGED
-            | WM_MOUSEWHEEL // use later as a key input(?)
-            | WM_MOUSEHWHEEL // ^
-        ) => Err(EventReaction::UseDefault),
-        _ => Err(EventReaction::Unrecognized),
+        // (
+              // WM_MOUSEFIRST
+            // | WM_SETCURSOR
+            // | WM_NCHITTEST
+            // | WM_NCLBUTTONDBLCLK
+            // | WM_NCMOUSELEAVE
+            // | WM_NCMOUSEMOVE
+            // | WM_WINDOWPOSCHANGED
+            // | WM_GETICON // user later
+            // | WM_MOVE // use later
+            // | WM_MOVING // or maybe this instead
+            // | WM_SETTEXT
+            // | WM_ACTIVATE // use later
+            // | WM_SYSKEYDOWN
+            // | WM_GETMINMAXINFO // use later
+            // | WM_CAPTURECHANGED
+            // | WM_MOUSEWHEEL // use later as a key input(?)
+            // | WM_MOUSEHWHEEL // ^
+        // ) => Err(EventReaction::UseDefault),
+        _ => Unknown,
     }
 }
 
@@ -262,31 +282,24 @@ extern "system" fn wnd_proc(
     // need to change resize event handling
     // don't use WM_SIZE
     // GetWindowRect + GetClientRect upon WM_WINDOWPOSCHANGING?
-    // can still send WM_SIZE to library users
-    println!("Window Size: {:?}", unsafe {get_window_rect(hwnd)}.size);
-    
-    match translate_message(msg) {
-        Ok(common) => unsafe {
-            println!(
-                "Event {:?} - wparam: {}, lparam_high: {}, lparam_low: {}",
-                common, 
-                wparam.0, 
-                lparam.0 as u32 >> 16,
-                lparam.0 as u16
-            );
+    let translation = translate_message(msg,wparam.0,lparam.0);
+    if let WndProcEvent::Unknown = translation {} else {
+        println!("{:?}",translation);
+    }
+    match translation {
+        WndProcEvent::Common(common) => unsafe {
             let window = get_window(hwnd);
             if window != std::ptr::null_mut() {
                 (*window).handle_event(common, crate::private::Internal);
             }
             LRESULT(0)
         },
-        Err(reaction) => match reaction {
-            EventReaction::Unrecognized => {
-                // println!("Unrecognized event with id {:02X}",msg);
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-            }, EventReaction::UseDefault => {
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-            }, EventReaction::NoOp => LRESULT(0),
+        WndProcEvent::Internal(internal) => match internal {
+            _ => unsafe { DefWindowProcW(hwnd,msg,wparam,lparam) },
+        }
+        WndProcEvent::Unknown => {
+            // println!("Unrecognized event with id {:02X}",msg);
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         },
     }
 }

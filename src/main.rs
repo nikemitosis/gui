@@ -18,7 +18,7 @@ fn main() -> Result<(),()> {
         "window", 
         Size {width: 800, height: 600}, 
         Box::new(SolidCell::new(
-            Pixel {r: 0xFF, g: 0x00, b: 0x00, a: 0x00},
+            Pixel {r: 0x60, g: 0xA0, b: 0xFF, a: 0x00},
         )),
         &handler
     )?;

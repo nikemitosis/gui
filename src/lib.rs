@@ -7,7 +7,7 @@ pub mod keys;
 
 pub use window::init;
 
-use std::ops::{Add,AddAssign};
+use std::ops::{Add,AddAssign,Sub};
 use std::sync::OnceLock;
 
 mod private { pub struct Internal; }
@@ -72,7 +72,7 @@ pub enum Event<T: 'static + Send> {
 #[repr(C)]
 #[derive(Clone,Copy,Debug,Default)]
 pub struct Pixel {
-    pub a: u8, pub r: u8, pub g: u8, pub b: u8, 
+    pub b: u8, pub g: u8, pub r: u8, pub a: u8
 } impl From<u32> for Pixel {
     fn from(a: u32) -> Self {
         let mut rt = Pixel::default();
@@ -181,4 +181,23 @@ pub struct Size {
     pub const fn set_height(&mut self, value: usize) { self.height = value; }
     pub const fn set_rows  (&mut self, value: usize) { self.height = value; }
     pub const fn set_cols  (&mut self, value: usize) { self.width  = value; }
+} impl AddAssign for Size {
+    fn add_assign(&mut self, a: Self) {
+        self.width += a.width;
+        self.height += a.height;
+    }
+} impl Add for Size {
+    type Output = Self;
+    fn add(mut self, a: Self) -> Self::Output {
+        self += a;
+        self
+    }
+} impl Sub for Size {
+    type Output = (isize,isize);
+    fn sub(self, a: Self) -> Self::Output {
+        (
+            self.width  as isize - a.width  as isize,
+            self.height as isize - a.height as isize,
+        )
+    }
 }

@@ -93,6 +93,7 @@ impl InternalSurfaceTrait for Surface {
             Ok(tup) => {
                 self.deallocate();
                 (self.internal.dib_bitmap_handle, self.internal.mem_hdc, self.root) = tup;
+                self.size = size;
                 self.as_slice = SurfaceSlice::from(&*self);
                 Ok(())
             }
